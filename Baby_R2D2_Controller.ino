@@ -18,7 +18,7 @@ AudioOutputI2SNoDAC *out;
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
-char auth[] = "";
+char auth[] = "<insert blynk token here>";
 int xVal, yVal, headSpeed, soundCnt;
 bool startup, xCmd, yCmd, headLeft, headRight;
 double rampUp;
