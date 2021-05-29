@@ -20,29 +20,27 @@ AudioOutputI2SNoDAC *out;
 // Go to the Project Settings (nut icon).
 char auth[] = "<insert blynk token here>";
 int xVal, yVal, headSpeed, soundCnt;
-bool startup, xCmd, yCmd, headLeft, headRight;
-double rampUp;
-int wifiStartupState;
+bool startup, headLeft, headRight;
+double rampUpHead, rampUpBody;
 
 Servo leftServo, rightServo, headServo;
 const int leftServoPin = D5;
 const int rightServoPin = D6;
 const int headServoPin = D7;
+const int NEUTRAL = 1500;
+const int CONTROLLER_NEUTRAL = 511;
+const int NEUTRAL_ZONE = 20;
+const int MIN_CONTROLLER = 0;
+const int MAX_CONTROLLER = 1024;
 
 WiFiServer server(80);
 
-BLYNK_WRITE(V1)
-{
-  xVal = param.asInt();
-  startup = true;
-  xCmd = true;
-}
-
 BLYNK_WRITE(V0)
 {
-  yVal = param.asInt();
+  xVal = param[0].asInt();
+  yVal = param[1].asInt();
+  
   startup = true;
-  yCmd = true;
 }
 
 BLYNK_WRITE(V2)
@@ -128,29 +126,24 @@ void setup()
 
 void loop()
 {
-
-  //leg motors
-  int modifiedY = map(xVal, 0, 1024, 0, 1000) - 500;
-  int modifiedX = map(yVal, 0, 1024, 0, 1000) - 500;
   int leftMotor, rightMotor;
+  //leg motors
+  int modifiedX = map(xVal, MIN_CONTROLLER, MAX_CONTROLLER, 0, 1000) - 500;
+  int modifiedY = map(yVal, MIN_CONTROLLER, MAX_CONTROLLER, 0, 1000) - 500;
 
   if (modifiedX < 0) {
-    leftMotor = 1500 + modifiedY;
-    rightMotor = 1500 - ((modifiedY + 1) / abs(modifiedY + 1)) * 500;
+    leftMotor = NEUTRAL + modifiedY;
+    rightMotor = NEUTRAL - ((modifiedY + 1) / abs(modifiedY + 1)) * 500;
   }
   else if (modifiedX > 0) {
-    leftMotor = 1500 + ((modifiedY + 1) / abs(modifiedY + 1)) * 500;
-    rightMotor = 1500 - modifiedY;
+    leftMotor = NEUTRAL + ((modifiedY + 1) / abs(modifiedY + 1)) * 500;
+    rightMotor = NEUTRAL - modifiedY;
   }
   else {
-    leftMotor = 1500 + modifiedY;
-    rightMotor = 1500 - modifiedY;
+    leftMotor = NEUTRAL + modifiedY;
+    rightMotor = NEUTRAL - modifiedY;
   }
 
-  Serial.print(leftMotor);
-  Serial.print(" - ");
-  Serial.println(rightMotor);
-  
   if(headLeft || headRight) {
     int multiplier;
     if(headLeft) {
@@ -161,19 +154,20 @@ void loop()
     }
     
     headServo.attach(headServoPin);
-    headServo.writeMicroseconds(1500 + map(headSpeed, 0, 1024, 0, 500) * multiplier * rampUp);
+    headServo.writeMicroseconds(NEUTRAL + map(headSpeed, 0, 1024, 0, 500) * multiplier * rampUpHead);
 
-    if(rampUp < 1.0) {
-      rampUp += 0.1;
+    if(rampUpHead < 1.0) {
+      rampUpHead += 0.1;
     }
   }
   else {
-    rampUp = 0.0;
+    rampUpHead = 0.0;
     headServo.detach();
   }
 
   if (startup) {
-    if(leftMotor >= 1495 && leftMotor <= 1505 && rightMotor >= 1495 && rightMotor <= 1505) {
+    if(leftMotor == NEUTRAL && rightMotor == NEUTRAL) {
+      rampUpBody = 0.0;
       leftServo.detach();
       rightServo.detach();
     }
@@ -186,8 +180,6 @@ void loop()
       }
       leftServo.writeMicroseconds(leftMotor);
       rightServo.writeMicroseconds(rightMotor);
-      xCmd = false;
-      yCmd = false;
     }
   }
   
